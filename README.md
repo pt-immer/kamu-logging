@@ -30,7 +30,7 @@ default.
 
 ```toml
 [dependencies]
-kamu‑logging = "0.1.1"
+kamu‑logging = "0.1.2"
 ```
 
 ```rust
@@ -50,7 +50,7 @@ disable the default features:
 
 ```toml
 [dependencies]
-kamu‑logging = { version = "0.1.1", default‑features = false, features = ["wasm32"] }
+kamu‑logging = { version = "0.1.2", default‑features = false, features = ["wasm32"] }
 ```
 
 ## License

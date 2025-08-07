@@ -19,16 +19,10 @@ pub enum Error {
     TracingGlobal(#[from] tracing::subscriber::SetGlobalDefaultError),
     #[error("{0}")]
     TracingLog(#[from] tracing_log::log::SetLoggerError),
+    #[error("{0}")]
+    TracingSubscriberTryInit(#[from] tracing_subscriber::util::TryInitError),
 }
 
-// Pull in extension traits when building the systemd subscriber. These
-// imports are conditionally compiled so that builds which do not enable
-// the `systemd` feature don’t pull in unused items. The `SubscriberExt`
-// trait provides the `with` method used to layer subscribers, and
-// `SubscriberInitExt` exposes the `try_init` method to install the
-// configured subscriber as the global default.
-#[cfg(feature = "systemd")]
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 pub fn init() -> std::result::Result<(), Error> {
     #[cfg(feature = "systemd")]
     init_systemd()?;
@@ -57,7 +51,8 @@ fn init_systemd() -> std::result::Result<(), Error> {
 
     // Start with a registry and attach the filter. Subsequent layers will
     // be added to this base subscriber.
-    let base = tracing_subscriber::registry().with(filter);
+    let base =
+        tracing_subscriber::layer::SubscriberExt::with(tracing_subscriber::registry(), filter);
 
     if console::Term::stdout().is_term() {
         // When running in an interactive terminal, use a formatted
@@ -69,18 +64,18 @@ fn init_systemd() -> std::result::Result<(), Error> {
             .with_line_number(true)
             .with_thread_ids(true);
 
-        let subscriber = base.with(fmt_layer);
+        let subscriber = tracing_subscriber::layer::SubscriberExt::with(base, fmt_layer);
         // `try_init` sets this subscriber as the global default. It will
         // return an error if a global subscriber has already been set.
-        subscriber.try_init()?;
+        tracing_subscriber::util::SubscriberInitExt::try_init(subscriber)?;
     } else {
         // Otherwise, assume journald is available and use a journald
         // subscriber. This will forward structured logs to the system
         // journal. If journald cannot be initialised it will return an
         // error which propagates up to the caller.
         let journald_layer = tracing_journald::layer()?;
-        let subscriber = base.with(journald_layer);
-        subscriber.try_init()?;
+        let subscriber = tracing_subscriber::layer::SubscriberExt::with(base, journald_layer);
+        tracing_subscriber::util::SubscriberInitExt::try_init(subscriber)?;
     }
 
     Ok(())
