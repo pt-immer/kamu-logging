@@ -67,9 +67,15 @@ fn init_systemd() -> std::result::Result<(), Error> {
         ))?;
     } else {
         let journald_layer = tracing_journald::layer()?;
-        tracing::subscriber::set_global_default(tracing_subscriber::layer::SubscriberExt::with(
+        let fmt_layer = tracing_subscriber::fmt::layer()
+            .with_ansi(false)
+            .with_writer(std::io::stderr);
+        let subscriber_with_journald = tracing_subscriber::layer::SubscriberExt::with(
             subscriber,
             journald_layer,
+        );
+        tracing::subscriber::set_global_default(tracing_subscriber::layer::SubscriberExt::with(
+            subscriber_with_journald, fmt_layer,
         ))?;
     }
 
