@@ -38,6 +38,11 @@ pub enum Error {
     TracingLog(#[from] tracing_log::log::SetLoggerError),
 }
 
+/// Initialize global tracing/logging subscriber.
+///
+/// # Errors
+///
+/// Returns an error if systemd logging setup fails or a global logger/subscriber is already set.
 pub fn init() -> std::result::Result<(), Error> {
     #[cfg(feature = "systemd")]
     init_systemd()?;
@@ -70,14 +75,9 @@ fn init_systemd() -> std::result::Result<(), Error> {
         ))?;
     } else {
         let journald_layer = tracing_journald::layer()?;
-        let fmt_layer = tracing_subscriber::fmt::layer()
-            .with_ansi(false)
-            .with_writer(std::io::stderr);
-        let subscriber_with_journald =
-            tracing_subscriber::layer::SubscriberExt::with(subscriber, journald_layer);
         tracing::subscriber::set_global_default(tracing_subscriber::layer::SubscriberExt::with(
-            subscriber_with_journald,
-            fmt_layer,
+            subscriber,
+            journald_layer,
         ))?;
     }
 
@@ -93,6 +93,7 @@ fn init_wasm32() {
 }
 
 #[cfg(feature = "with-actix-web")]
+#[must_use]
 pub fn get_actix_web_logger()
 -> tracing_actix_web::TracingLogger<tracing_actix_web::DefaultRootSpanBuilder> {
     tracing_actix_web::TracingLogger::default()
