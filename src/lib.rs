@@ -1,100 +1,74 @@
+//! `kamu-logging` — opinionated `tracing` setup for PT IMMER services.
+//!
+//! Call [`init`] from `main` for the zero-config path, or [`init_with`] with
+//! an [`InitOptions`] builder for explicit format / sink / filter / OTLP
+//! configuration. See the crate README for worked examples.
+//!
+//! Re-exports common `tracing` items so consumers can avoid a separate
+//! `tracing` import for the basic logging vocabulary.
+
+#![deny(missing_docs)]
+
 #[cfg(all(feature = "systemd", feature = "wasm32"))]
 compile_error!("Feature \"systemd\" can't be combined with \"wasm32\".");
 
 #[cfg(all(feature = "with-actix-web", feature = "wasm32"))]
 compile_error!("Feature \"with-actix-web\" can't be combined with \"wasm32\".");
 
+#[cfg(all(feature = "with-otlp", feature = "wasm32"))]
+compile_error!("Feature \"with-otlp\" can't be combined with \"wasm32\".");
+
 #[cfg(not(any(feature = "systemd", feature = "wasm32")))]
 compile_error!("At least feature \"systemd\" or \"wasm32\" must be enabled.");
 
-/// basic re-exports
-pub use tracing::{debug, error, info, trace, warn};
+pub mod correlation;
 
-#[cfg(all(debug_assertions, feature = "systemd"))]
-const TRACING_FILTER: &str = "debug";
-#[cfg(all(not(debug_assertions), feature = "systemd"))]
-const TRACING_FILTER: &str = "info";
-
-#[cfg(feature = "wasm32")]
-static WASM32_LOG_INIT: std::sync::OnceLock<()> = std::sync::OnceLock::new();
-
-#[cfg(feature = "wasm32")]
-#[derive(thiserror::Error, Debug)]
-pub enum Error {
-    #[error("{0}")]
-    IO(#[from] std::io::Error),
-    #[error("{0}")]
-    TracingGlobal(#[from] tracing::subscriber::SetGlobalDefaultError),
-}
-
-#[cfg(feature = "systemd")]
-#[derive(thiserror::Error, Debug)]
-pub enum Error {
-    #[error("{0}")]
-    IO(#[from] std::io::Error),
-    #[error("{0}")]
-    TracingGlobal(#[from] tracing::subscriber::SetGlobalDefaultError),
-    #[error("{0}")]
-    TracingLog(#[from] tracing_log::log::SetLoggerError),
-}
-
-/// Initialize global tracing/logging subscriber.
-///
-/// # Errors
-///
-/// Returns an error if systemd logging setup fails or a global logger/subscriber is already set.
-pub fn init() -> std::result::Result<(), Error> {
-    #[cfg(feature = "systemd")]
-    init_systemd()?;
-    #[cfg(feature = "wasm32")]
-    init_wasm32();
-
-    tracing::info!("Logging initialized");
-
-    Ok(())
-}
-
-#[cfg(feature = "systemd")]
-fn init_systemd() -> std::result::Result<(), Error> {
-    tracing_log::LogTracer::init()?;
-    let filter_layer = tracing_subscriber::EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(TRACING_FILTER));
-    let subscriber = tracing_subscriber::layer::SubscriberExt::with(
-        tracing_subscriber::registry(),
-        filter_layer,
-    );
-
-    if console::Term::stdout().is_term() {
-        let fmt_layer = tracing_subscriber::fmt::layer()
-            .with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE)
-            .with_ansi(true)
-            .with_line_number(true)
-            .with_thread_ids(true);
-        tracing::subscriber::set_global_default(tracing_subscriber::layer::SubscriberExt::with(
-            subscriber, fmt_layer,
-        ))?;
-    } else {
-        let journald_layer = tracing_journald::layer()?;
-        tracing::subscriber::set_global_default(tracing_subscriber::layer::SubscriberExt::with(
-            subscriber,
-            journald_layer,
-        ))?;
-    }
-
-    Ok(())
-}
-
-#[cfg(feature = "wasm32")]
-fn init_wasm32() {
-    let _ = WASM32_LOG_INIT.get_or_init(|| {
-        console_error_panic_hook::set_once();
-        let _ = wasm_tracing::try_set_as_global_default();
-    });
-}
+mod init;
+mod options;
 
 #[cfg(feature = "with-actix-web")]
-#[must_use]
-pub fn get_actix_web_logger()
--> tracing_actix_web::TracingLogger<tracing_actix_web::DefaultRootSpanBuilder> {
-    tracing_actix_web::TracingLogger::default()
+mod actix;
+
+#[cfg(feature = "with-otlp")]
+pub mod otlp;
+
+pub use crate::init::{init, init_or_skip, init_with};
+pub use crate::options::{Format, InitOptions, Sink};
+
+#[cfg(feature = "with-actix-web")]
+pub use crate::actix::{EnrichedRootSpanBuilder, get_actix_web_logger, get_actix_web_logger_with};
+
+/// Re-exports of the common `tracing` vocabulary so consumers can
+/// `use kamu_logging::{info, instrument, ...}` without a separate import.
+pub use tracing::{
+    Level, Span, debug, enabled, error, event, info, instrument, span, trace, warn,
+};
+
+/// Errors returned by [`init`] / [`init_with`].
+///
+/// Marked `#[non_exhaustive]` so future variants are not breaking changes.
+#[non_exhaustive]
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    /// I/O failure during subscriber setup (typically the journald socket).
+    #[error("{0}")]
+    IO(#[from] std::io::Error),
+
+    /// A subscriber is already set and `idempotent` was `false`.
+    #[error("logging subscriber already initialized")]
+    AlreadyInitialized,
+
+    /// `tracing::subscriber::set_global_default` failed.
+    #[error("{0}")]
+    TracingGlobal(#[from] tracing::subscriber::SetGlobalDefaultError),
+
+    /// `log::set_logger` failed (the `log` → `tracing` bridge).
+    #[cfg(feature = "systemd")]
+    #[error("{0}")]
+    TracingLog(#[from] tracing_log::log::SetLoggerError),
+
+    /// OTLP exporter construction failed.
+    #[cfg(feature = "with-otlp")]
+    #[error("OTLP init failed: {0}")]
+    OtlpInit(String),
 }

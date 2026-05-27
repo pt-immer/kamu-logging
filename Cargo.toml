@@ -10,15 +10,23 @@ name = "kamu-logging"
 publish = true
 readme = "README.md"
 repository = "https://github.com/pt-immer/kamu-logging"
-version = "0.2.0"
+rust-version = "1.85"
+version = "1.0.0"
 
 [features]
 default = ["systemd", "with-actix-web"]
 systemd = ["dep:console", "dep:tracing-journald", "dep:tracing-log", "dep:tracing-subscriber"]
 wasm32 = ["dep:console_error_panic_hook", "dep:tracing-subscriber", "dep:wasm-tracing"]
-with-actix-web = ["dep:tracing-actix-web"]
+with-actix-web = ["dep:actix-web", "dep:tracing-actix-web"]
+with-otlp = [
+    "dep:opentelemetry",
+    "dep:opentelemetry_sdk",
+    "dep:opentelemetry-otlp",
+    "dep:tracing-opentelemetry",
+]
 
 [dependencies]
+actix-web = { version = "4", optional = true, default-features = false }
 console = { version = "~0.16", optional = true }
 console_error_panic_hook = { version = "~0.1.7", optional = true }
 thiserror = "~2"
@@ -27,6 +35,11 @@ tracing-actix-web = { version = "~0.7", optional = true }
 tracing-journald = { version = "~0.3", optional = true }
 tracing-log = { version = "~0.2", optional = true }
 wasm-tracing = { version = "~2.1.0", features = ["tracing-log"], optional = true }
+
+opentelemetry = { version = "~0.32", optional = true, default-features = false, features = ["trace"] }
+opentelemetry_sdk = { version = "~0.32", optional = true, default-features = false, features = ["trace"] }
+opentelemetry-otlp = { version = "~0.32", optional = true, default-features = false, features = ["trace", "http-proto", "reqwest-blocking-client"] }
+tracing-opentelemetry = { version = "~0.33", optional = true, default-features = false, features = ["tracing-log"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tracing-subscriber = { version = "~0.3", optional = true, features = [
@@ -46,3 +59,19 @@ tracing-subscriber = { version = "~0.3", optional = true, default-features = fal
     "alloc",
     "fmt",
 ] }
+
+[dev-dependencies]
+actix-web = "4"
+
+[[example]]
+name = "minimal"
+required-features = ["systemd"]
+
+[[example]]
+name = "json_stdout"
+required-features = ["systemd"]
+
+[[example]]
+name = "actix"
+required-features = ["systemd", "with-actix-web"]
+
