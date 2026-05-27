@@ -4,6 +4,33 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project follows
 [SemVer](https://semver.org/) from `1.0.0` onwards.
 
+## [1.1.0] — 2026-05-27
+
+Additive feature release focused on first-class Cloudflare Worker support.
+
+### Added
+
+- Cloudflare Worker-compatible `wasm32` logging path using `tracing-web`,
+  `tracing-subscriber` JSON/time formatting, and `time` with
+  `wasm-bindgen`.
+- Dedicated Cloudflare Worker example app in
+  `examples/cloudflare-worker/` with `workers-rs`, Wrangler config, and
+  observability enabled.
+- `docs/CLOUDFLARE_WORKERS.md` guide covering setup, filtering,
+  correlation ids, and Workers Logs.
+- `tests/options.rs` coverage for env-value parsing and invalid
+  configuration error display.
+- `just validate-wasm32` and Worker example validation wired into CI.
+
+### Changed
+
+- `wasm32` logging now targets Cloudflare Workers / web console output
+  instead of the previous `wasm-tracing` path.
+- `Format::Auto` resolves to JSON on wasm32; `Format::Pretty` falls back
+  to compact non-ANSI output.
+- `init_with()` now rejects unsupported wasm options such as
+  `Sink::Journald` with `Error::InvalidConfiguration`.
+
 ## [1.0.0] — 2026-05-27
 
 First stable release. Single breaking-change release that turns the crate
