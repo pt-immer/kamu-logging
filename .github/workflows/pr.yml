@@ -1,17 +1,19 @@
 name: PR
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [main]
-  push:
-    branches: [main]
+    # Default types (opened, synchronize, reopened) — explicit for clarity.
+    # `closed` is intentionally excluded so merges/closures do not re-run CI.
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
   pull-requests: read
 
 concurrency:
-  group: pr-${{ github.event.pull_request.number || github.ref }}
+  group: pr-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 env:
@@ -27,7 +29,7 @@ jobs:
     name: rustfmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
@@ -40,7 +42,7 @@ jobs:
     name: markdownlint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: taiki-e/install-action@v2
         with:
           tool: just
@@ -51,7 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: fmt
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
@@ -71,7 +73,7 @@ jobs:
       matrix:
         profile: [default, systemd, all]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
@@ -92,7 +94,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: fmt
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
@@ -107,7 +109,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: fmt
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@1.85
       - uses: Swatinem/rust-cache@v2
       # MSRV job pre-activates Rust 1.85 via dtolnay action, so call cargo
@@ -122,7 +124,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: fmt
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
@@ -135,7 +137,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: fmt
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: llvm-tools-preview
@@ -151,13 +153,13 @@ jobs:
         if: env.CODECOV_TOKEN != ''
         env:
           CODECOV_TOKEN: ${{ secrets.SECRET_CODECOV_TOKEN }}
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.SECRET_CODECOV_TOKEN }}
           files: lcov.info
           fail_ci_if_error: false
       - name: Upload lcov artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-lcov
           path: |
@@ -168,11 +170,8 @@ jobs:
     name: cargo audit
     runs-on: ubuntu-latest
     needs: fmt
-    # Advisory database changes upstream; a new RUSTSEC entry should not
-    # block unrelated PRs. The step still runs and logs the advisory.
-    continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@v2
         with:
@@ -186,7 +185,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: fmt
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       # `hashFiles` is not allowed in job-level `if:`, so gate inside a
       # step. Subsequent steps no-op when `deny.toml` is absent.
       - id: check
@@ -213,7 +212,7 @@ jobs:
     # Only meaningful for PRs; on direct pushes to main the baseline equals HEAD.
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: Swatinem/rust-cache@v2
       - uses: obi1kenobi/cargo-semver-checks-action@v2
         with:

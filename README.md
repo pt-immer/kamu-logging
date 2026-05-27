@@ -1,5 +1,12 @@
 # kamu-logging
 
+[![Crates.io][badge-crates]][link-crates]
+[![docs.rs][badge-docs]][link-docs]
+[![CI][badge-ci]][link-ci]
+
+[![License][badge-license]][link-license]
+[![MSRV][badge-msrv]][link-msrv]
+
 Opinionated `tracing` setup for PT IMMER services. One-line init for the
 zero-config path; a builder for everything else (JSON output, custom env
 vars, OTLP export, correlation ids).
@@ -200,3 +207,15 @@ minor releases. Bug fixes ship as patches. The `Error` enum is
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+[badge-crates]: https://img.shields.io/crates/v/kamu-logging?style=flat-square&logo=rust
+[badge-docs]: https://img.shields.io/docsrs/kamu-logging?style=flat-square&logo=docs.rs&label=docs.rs
+[badge-ci]: https://img.shields.io/github/actions/workflow/status/pt-immer/kamu-logging/pr.yml?style=flat-square&label=CI
+[badge-license]: https://img.shields.io/crates/l/kamu-logging?style=flat-square
+[badge-msrv]: https://img.shields.io/badge/MSRV-1.85-blue?style=flat-square&logo=rust
+
+[link-crates]: https://crates.io/crates/kamu-logging
+[link-docs]: https://docs.rs/kamu-logging
+[link-ci]: https://github.com/pt-immer/kamu-logging/actions/workflows/pr.yml
+[link-license]: https://github.com/pt-immer/kamu-logging/blob/main/LICENSE
+[link-msrv]: https://github.com/pt-immer/kamu-logging/blob/main/Cargo.toml

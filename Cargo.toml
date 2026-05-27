@@ -20,8 +20,8 @@ wasm32 = ["dep:console_error_panic_hook", "dep:tracing-subscriber", "dep:wasm-tr
 with-actix-web = ["dep:actix-web", "dep:tracing-actix-web"]
 with-otlp = [
     "dep:opentelemetry",
-    "dep:opentelemetry_sdk",
     "dep:opentelemetry-otlp",
+    "dep:opentelemetry_sdk",
     "dep:tracing-opentelemetry",
 ]
 
@@ -36,10 +36,20 @@ tracing-journald = { version = "~0.3", optional = true }
 tracing-log = { version = "~0.2", optional = true }
 wasm-tracing = { version = "~2.1.0", features = ["tracing-log"], optional = true }
 
-opentelemetry = { version = "~0.32", optional = true, default-features = false, features = ["trace"] }
-opentelemetry_sdk = { version = "~0.32", optional = true, default-features = false, features = ["trace"] }
-opentelemetry-otlp = { version = "~0.32", optional = true, default-features = false, features = ["trace", "http-proto", "reqwest-blocking-client"] }
-tracing-opentelemetry = { version = "~0.33", optional = true, default-features = false, features = ["tracing-log"] }
+opentelemetry = { version = "~0.32", optional = true, default-features = false, features = [
+    "trace",
+] }
+opentelemetry-otlp = { version = "~0.32", optional = true, default-features = false, features = [
+    "http-proto",
+    "reqwest-blocking-client",
+    "trace",
+] }
+opentelemetry_sdk = { version = "~0.32", optional = true, default-features = false, features = [
+    "trace",
+] }
+tracing-opentelemetry = { version = "~0.33", optional = true, default-features = false, features = [
+    "tracing-log",
+] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tracing-subscriber = { version = "~0.3", optional = true, features = [
@@ -74,4 +84,3 @@ required-features = ["systemd"]
 [[example]]
 name = "actix"
 required-features = ["systemd", "with-actix-web"]
-

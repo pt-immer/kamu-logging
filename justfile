@@ -98,6 +98,10 @@ lint-rs:
 lint-md:
     npx --yes markdownlint-cli2
 
+# Validate GitHub Actions workflow files (requires `actionlint` on PATH).
+lint-actions:
+    actionlint .github/workflows/*.yml
+
 # --- Docs -----------------------------------------------------------------
 
 # Build docs locally and open in browser.
@@ -117,10 +121,10 @@ msrv:
 
 # --- Security -------------------------------------------------------------
 
-# Run cargo audit. Warnings (e.g. unmaintained advisories) are logged but
-# do not fail; only errors (vulnerabilities) cause a non-zero exit.
+# Run cargo audit with warnings promoted to errors. This catches both
+# vulnerabilities (e.g. RUSTSEC time DoS) and yanked / unmaintained crates.
 audit:
-    cargo audit
+    cargo audit --deny warnings
 
 # Run cargo deny check (requires `cargo install cargo-deny` and deny.toml).
 deny:
