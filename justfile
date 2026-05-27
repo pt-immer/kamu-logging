@@ -4,7 +4,7 @@
 # Non-wasm feature bundle. `--all-features` clashes with the
 # systemd <-> wasm32 compile_error invariant; CI uses this exact string.
 ci_features := "systemd,with-actix-web,with-otlp"
-msrv := "1.85"
+msrv := "1.88"
 
 # Show the task list.
 default:

@@ -105,14 +105,14 @@ jobs:
       - run: just build-wasm
 
   msrv:
-    name: MSRV (1.85)
+    name: MSRV (1.88)
     runs-on: ubuntu-latest
     needs: fmt
     steps:
       - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@1.85
+      - uses: dtolnay/rust-toolchain@1.88
       - uses: Swatinem/rust-cache@v2
-      # MSRV job pre-activates Rust 1.85 via dtolnay action, so call cargo
+      # MSRV job pre-activates Rust 1.88 via dtolnay action, so call cargo
       # directly (the `just msrv` recipe re-activates via `rustup run`).
       - name: check (default)
         run: cargo check

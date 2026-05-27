@@ -10,7 +10,7 @@ name = "kamu-logging"
 publish = true
 readme = "README.md"
 repository = "https://github.com/pt-immer/kamu-logging"
-rust-version = "1.85"
+rust-version = "1.88"
 version = "1.0.0"
 
 [features]
