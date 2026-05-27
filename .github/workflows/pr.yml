@@ -89,8 +89,8 @@ jobs:
         if: matrix.profile == 'all'
         run: just test-all
 
-  build-wasm:
-    name: build wasm32
+  validate-wasm32:
+    name: validate wasm32
     runs-on: ubuntu-latest
     needs: fmt
     steps:
@@ -102,7 +102,7 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: just
-      - run: just build-wasm
+      - run: just validate-wasm32
 
   msrv:
     name: MSRV (1.88)

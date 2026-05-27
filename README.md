@@ -27,7 +27,7 @@ MSRV: **Rust 1.88** (edition 2024).
 | `systemd`        |   yes   | TTY-aware console + journald sink, `RUST_LOG`, `log` → `tracing` bridge |
 | `with-actix-web` |   yes   | Correlation-enriched Actix Web middleware                              |
 | `with-otlp`      |   no    | OpenTelemetry OTLP exporter (HTTP/protobuf)                           |
-| `wasm32`         |   no    | Browser console + panic hook (mutually exclusive with the others)     |
+| `wasm32`         |   no    | Cloudflare Worker / web console + panic hook (mutually exclusive)     |
 
 ## Quickstart
 
@@ -168,9 +168,25 @@ built-in option.
 kamu-logging = { version = "1", default-features = false, features = ["wasm32"] }
 ```
 
-`init()` on wasm32 installs `console_error_panic_hook` and the
-`wasm-tracing` subscriber. The function is idempotent on this target by
-design; subsequent calls are no-ops.
+`init()` on wasm32 installs `console_error_panic_hook` and a
+`tracing-subscriber` console writer suitable for Cloudflare Workers Logs.
+`Format::Auto` resolves to JSON, while `Sink::Auto`, `Sink::Stdout`, and
+`Sink::Stderr` all write to the JavaScript console. The function is
+idempotent on this target by design; subsequent calls are no-ops.
+
+## Cloudflare Workers
+
+Use `workers-rs` as usual, disable default features, and enable `wasm32`:
+
+```toml
+[dependencies]
+kamu-logging = { version = "1", default-features = false, features = ["wasm32"] }
+worker = "0.8"
+```
+
+The repository includes a standalone Worker app in
+`examples/cloudflare-worker/`. For setup, Wrangler config, Workers Logs, and
+correlation-id examples, see [the Cloudflare Workers guide](docs/CLOUDFLARE_WORKERS.md).
 
 ## Idempotence
 
