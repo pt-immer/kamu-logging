@@ -1,5 +1,5 @@
-# kamu-logging dev tasks. Run `just` (no args) to list. Run `just verify`
-# locally to mirror what the PR gate runs.
+# kamu-logging dev tasks. Run `just` (no args) to list. Run `just gate-all`
+# locally to mirror the PR gate.
 
 # Non-wasm feature bundle. `--all-features` clashes with the
 # systemd <-> wasm32 compile_error invariant; CI uses this exact string.
@@ -9,6 +9,32 @@ msrv := "1.85"
 # Show the task list.
 default:
     @just --list --unsorted
+
+# --- Setup ----------------------------------------------------------------
+
+# Install every dev tool `just gate-slow` expects.
+setup:
+    cargo install cargo-audit cargo-llvm-cov cargo-semver-checks
+    rustup component add llvm-tools-preview
+    rustup toolchain install {{msrv}}
+    @echo "Optional: install cargo-deny if you maintain a deny.toml."
+
+# Diagnose which dev tools are present on this machine.
+doctor:
+    @echo "=== Toolchain ==="
+    @command -v cargo >/dev/null && echo "[ok]      cargo ($(cargo --version | cut -d' ' -f2))" || echo "[missing] cargo"
+    @rustup toolchain list 2>/dev/null | grep -q '^{{msrv}}' && echo "[ok]      rust {{msrv}} (MSRV)" || echo "[missing] rust {{msrv}}    (run: just setup)"
+    @rustup component list --installed 2>/dev/null | grep -q llvm-tools-preview && echo "[ok]      llvm-tools-preview" || echo "[missing] llvm-tools-preview (run: just setup)"
+    @echo
+    @echo "=== Cargo extensions ==="
+    @command -v cargo-audit >/dev/null && echo "[ok]      cargo-audit" || echo "[missing] cargo-audit         (run: just setup)"
+    @command -v cargo-llvm-cov >/dev/null && echo "[ok]      cargo-llvm-cov" || echo "[missing] cargo-llvm-cov      (run: just setup)"
+    @command -v cargo-semver-checks >/dev/null && echo "[ok]      cargo-semver-checks" || echo "[missing] cargo-semver-checks (run: just setup)"
+    @command -v cargo-deny >/dev/null && echo "[ok]      cargo-deny" || echo "[note]    cargo-deny          (optional)"
+    @echo
+    @echo "=== External ==="
+    @command -v just >/dev/null && echo "[ok]      just" || echo "[missing] just"
+    @command -v npx >/dev/null && echo "[ok]      npx (markdownlint runner)" || echo "[missing] npx (Node.js needed for lint-md)"
 
 # --- Build ----------------------------------------------------------------
 
@@ -24,7 +50,7 @@ build-all:
 build-wasm:
     cargo build --no-default-features --features wasm32 --target wasm32-unknown-unknown
 
-# Build everything (default + systemd-only + wasm32 + with-otlp).
+# Build every supported profile (default + systemd-only + wasm32 + with-otlp).
 build-matrix: build
     cargo build --no-default-features --features systemd
     just build-wasm
@@ -40,35 +66,42 @@ test:
 test-all:
     cargo test --features {{ci_features}}
 
+# Run tests with systemd only (no actix-web, no otlp).
+test-systemd:
+    cargo test --no-default-features --features systemd
+
 # --- Format ---------------------------------------------------------------
 
 # Apply rustfmt across the tree.
-fmt:
+fmt-all:
     cargo fmt --all
 
 # Verify rustfmt cleanliness (PR gate).
 fmt-check:
     cargo fmt --all --check
 
+# Apply markdownlint auto-fix where possible.
+fmt-md:
+    npx --yes markdownlint-cli2 --fix
+
 # --- Lint -----------------------------------------------------------------
 
+# Run every linter (Rust + Markdown).
+lint-all: lint-rs lint-md
+
 # Clippy across the full bundle + wasm32 with -D warnings.
-clippy:
+lint-rs:
     cargo clippy --all-targets --features {{ci_features}} -- -D warnings
     cargo clippy --no-default-features --features wasm32 --target wasm32-unknown-unknown -- -D warnings
 
-# Markdown lint (requires Node.js / npx).
-md-lint:
+# Run markdownlint (requires Node.js / npx).
+lint-md:
     npx --yes markdownlint-cli2
-
-# Markdown lint with auto-fix where possible.
-md-fix:
-    npx --yes markdownlint-cli2 --fix
 
 # --- Docs -----------------------------------------------------------------
 
 # Build docs locally and open in browser.
-doc:
+doc-open:
     cargo doc --no-deps --features {{ci_features}} --open
 
 # Build docs treating warnings as errors (PR gate).
@@ -132,17 +165,10 @@ tag VERSION:
 
 # --- Aggregates ---------------------------------------------------------
 
-# Run every check that the PR gate runs, in CI order. Mirrors pr.yml.
-verify: fmt-check clippy test-all build-wasm doc-check md-lint audit
+# Run every check that the PR gate runs. Mirrors pr.yml.
+gate-all: fmt-check lint-all test-all build-wasm doc-check audit
     @echo "All PR gates passed locally."
 
-# Like verify, plus the slow checks (coverage + semver + msrv).
-verify-full: verify coverage semver msrv
-    @echo "All PR + nightly-style gates passed locally."
-
-# Install all the tooling `just verify-full` needs.
-install-tools:
-    cargo install cargo-audit cargo-llvm-cov cargo-semver-checks
-    rustup component add llvm-tools-preview
-    rustup toolchain install {{msrv}}
-    @echo "Don't forget: deny.toml is optional; install cargo-deny if you use it."
+# Like gate-all, plus the slow checks (coverage + semver + msrv).
+gate-slow: gate-all coverage semver msrv
+    @echo "All PR + slow gates passed locally."
