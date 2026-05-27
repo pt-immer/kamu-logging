@@ -71,5 +71,8 @@ fn parse_traceparent_rejects_short_trace_id() {
 
 #[test]
 fn parse_traceparent_rejects_non_hex() {
-    assert!(parse_traceparent_trace_id("00-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-aaaaaaaaaaaaaaaa-01").is_none());
+    assert!(
+        parse_traceparent_trace_id("00-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-aaaaaaaaaaaaaaaa-01")
+            .is_none()
+    );
 }

@@ -40,9 +40,7 @@ pub use crate::actix::{EnrichedRootSpanBuilder, get_actix_web_logger, get_actix_
 
 /// Re-exports of the common `tracing` vocabulary so consumers can
 /// `use kamu_logging::{info, instrument, ...}` without a separate import.
-pub use tracing::{
-    Level, Span, debug, enabled, error, event, info, instrument, span, trace, warn,
-};
+pub use tracing::{Level, Span, debug, enabled, error, event, info, instrument, span, trace, warn};
 
 /// Errors returned by [`init`] / [`init_with`].
 ///

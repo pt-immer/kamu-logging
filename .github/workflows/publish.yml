@@ -44,10 +44,10 @@ jobs:
         run: cargo build --features with-otlp
 
       - name: Test
-        run: cargo test --all-features
+        run: cargo test --features systemd,with-actix-web,with-otlp
 
       - name: Doc build
-        run: cargo doc --no-deps --all-features
+        run: cargo doc --no-deps --features systemd,with-actix-web,with-otlp
         env:
           RUSTDOCFLAGS: -D warnings
 

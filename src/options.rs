@@ -166,6 +166,10 @@ impl InitOptions {
         if let Some(filter) = self.default_filter.as_deref() {
             return filter;
         }
-        if cfg!(debug_assertions) { "debug" } else { "info" }
+        if cfg!(debug_assertions) {
+            "debug"
+        } else {
+            "info"
+        }
     }
 }

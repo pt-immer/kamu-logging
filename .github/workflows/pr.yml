@@ -1,0 +1,174 @@
+name: PR
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  # Non-wasm CI feature bundle. `--all-features` clashes with the
+  # systemd <-> wasm32 compile_error invariant.
+  CI_FEATURES: systemd,with-actix-web,with-otlp
+
+jobs:
+  fmt:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check
+
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    needs: fmt
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: clippy (full feature bundle)
+        run: cargo clippy --all-targets --features ${{ env.CI_FEATURES }} -- -D warnings
+      - name: clippy (wasm32)
+        run: cargo clippy --no-default-features --features wasm32 --target wasm32-unknown-unknown -- -D warnings
+
+  test:
+    name: test (${{ matrix.profile }})
+    runs-on: ubuntu-latest
+    needs: fmt
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: default
+            args: ""
+          - profile: systemd-only
+            args: "--no-default-features --features systemd"
+          - profile: full
+            args: "--features systemd,with-actix-web,with-otlp"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test ${{ matrix.args }}
+
+  build-wasm:
+    name: build wasm32
+    runs-on: ubuntu-latest
+    needs: fmt
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --no-default-features --features wasm32 --target wasm32-unknown-unknown
+
+  msrv:
+    name: MSRV (1.85)
+    runs-on: ubuntu-latest
+    needs: fmt
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.85
+      - uses: Swatinem/rust-cache@v2
+      - name: check (default)
+        run: cargo check
+      - name: check (full feature bundle)
+        run: cargo check --features ${{ env.CI_FEATURES }}
+
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    needs: fmt
+    env:
+      RUSTDOCFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo doc --no-deps --features ${{ env.CI_FEATURES }}
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    needs: fmt
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo llvm-cov (lcov)
+        run: cargo llvm-cov --features ${{ env.CI_FEATURES }} --lcov --output-path lcov.info
+      - name: cargo llvm-cov (summary)
+        run: cargo llvm-cov report --features ${{ env.CI_FEATURES }} --summary-only | tee coverage-summary.txt
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: lcov.info
+          fail_ci_if_error: false
+      - name: Upload lcov artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: |
+            lcov.info
+            coverage-summary.txt
+
+  audit:
+    name: cargo audit
+    runs-on: ubuntu-latest
+    needs: fmt
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      # Cargo.lock is gitignored (library convention) - generate before audit.
+      - run: cargo generate-lockfile
+      - run: cargo audit --deny warnings
+
+  deny:
+    name: cargo deny
+    runs-on: ubuntu-latest
+    needs: fmt
+    if: hashFiles('deny.toml') != ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+      - run: cargo deny check
+
+  semver:
+    name: semver-checks
+    runs-on: ubuntu-latest
+    needs: fmt
+    steps:
+      - uses: actions/checkout@v4
+      - uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          feature-group: only-explicit-features
+          features: systemd,with-actix-web,with-otlp
+

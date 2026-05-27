@@ -15,14 +15,12 @@ pub struct EnrichedRootSpanBuilder;
 
 impl RootSpanBuilder for EnrichedRootSpanBuilder {
     fn on_request_start(request: &ServiceRequest) -> Span {
-        let correlation_id = extract_from_headers(request.headers(), DEFAULT_HEADER_CHAIN, |h, n| {
-            h.get(n).and_then(|v| v.to_str().ok()).map(str::to_owned)
-        });
+        let correlation_id =
+            extract_from_headers(request.headers(), DEFAULT_HEADER_CHAIN, |h, n| {
+                h.get(n).and_then(|v| v.to_str().ok()).map(str::to_owned)
+            });
 
-        let span = tracing_actix_web::root_span!(
-            request,
-            correlation_id = tracing::field::Empty
-        );
+        let span = tracing_actix_web::root_span!(request, correlation_id = tracing::field::Empty);
         if let Some(id) = correlation_id {
             span.record("correlation_id", tracing::field::display(&id));
         }
