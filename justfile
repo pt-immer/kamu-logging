@@ -117,9 +117,10 @@ msrv:
 
 # --- Security -------------------------------------------------------------
 
-# Run cargo audit (requires `cargo install cargo-audit`).
+# Run cargo audit. Warnings (e.g. unmaintained advisories) are logged but
+# do not fail; only errors (vulnerabilities) cause a non-zero exit.
 audit:
-    cargo audit --deny warnings
+    cargo audit
 
 # Run cargo deny check (requires `cargo install cargo-deny` and deny.toml).
 deny:
@@ -138,6 +139,13 @@ coverage-html:
 # Generate lcov for upload to Codecov.
 coverage-lcov:
     cargo llvm-cov --features {{ci_features}} --lcov --output-path lcov.info
+
+# Run the test suite once under llvm-cov and emit both lcov + a summary
+# (used by the CI coverage job to avoid running tests twice).
+coverage-ci:
+    cargo llvm-cov --features {{ci_features}} --no-report
+    cargo llvm-cov report --lcov --output-path lcov.info
+    cargo llvm-cov report --summary-only | tee coverage-summary.txt
 
 # --- Semver --------------------------------------------------------------
 

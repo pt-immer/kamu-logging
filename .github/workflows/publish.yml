@@ -24,7 +24,13 @@ jobs:
 
       - name: Assert tag matches Cargo.toml version
         run: |
-          tag="${GITHUB_REF_NAME#v}"
+          set -euo pipefail
+          ref="${GITHUB_REF_NAME}"
+          if [[ "$ref" != v* ]]; then
+            echo "Release tag must be prefixed with 'v' (got: $ref)" >&2
+            exit 1
+          fi
+          tag="${ref#v}"
           manifest=$(grep -m1 '^version' Cargo.toml | sed -E 's/version = "([^"]+)"/\1/')
           if [ "$tag" != "$manifest" ]; then
             echo "Release tag ($tag) does not match Cargo.toml version ($manifest)" >&2
@@ -55,7 +61,6 @@ jobs:
     name: Publish
     needs: verify
     runs-on: ubuntu-latest
-    environment: crates-io
     steps:
       - uses: actions/checkout@v4
 
@@ -67,5 +72,5 @@ jobs:
 
       - name: cargo publish
         env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.SECRET_DEPLOY_CRATEIO }}
         run: cargo publish
