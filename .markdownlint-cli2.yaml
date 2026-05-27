@@ -1,0 +1,21 @@
+config:
+  default: true
+  # Disable hard line-length rule; prose wrapping is editor-dependent.
+  MD013: false
+  # CHANGELOG.md repeats "### Added" / "### Changed" under each release.
+  MD024:
+    siblings_only: true
+  # Allow inline HTML (occasional <br>, <details> in README/CHANGELOG).
+  MD033: false
+  # Don't require the first line to be a top-level heading.
+  MD041: false
+  # Don't require table pipes to align - long descriptions make it painful.
+  MD060: false
+
+globs:
+  - "**/*.md"
+
+ignores:
+  - "target/**"
+  - "node_modules/**"
+  - ".github/**"
