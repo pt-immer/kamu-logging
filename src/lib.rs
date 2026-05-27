@@ -3,6 +3,10 @@
 //! Call [`init`] from `main` for the zero-config path, or [`init_with`] with
 //! an [`InitOptions`] builder for explicit format / sink / filter / OTLP
 //! configuration. See the crate README for worked examples.
+//! On `wasm32-unknown-unknown`, enable only the `wasm32` feature to install a
+//! panic hook and emit `tracing` events to the JavaScript console. This path is
+//! suitable for Cloudflare Workers via `workers-rs`; systemd, Actix Web, and
+//! OTLP exporter features are native-only.
 //!
 //! Re-exports common `tracing` items so consumers can avoid a separate
 //! `tracing` import for the basic logging vocabulary.
@@ -55,6 +59,10 @@ pub enum Error {
     /// A subscriber is already set and `idempotent` was `false`.
     #[error("logging subscriber already initialized")]
     AlreadyInitialized,
+
+    /// The requested options are not supported on the selected target.
+    #[error("invalid logging configuration: {0}")]
+    InvalidConfiguration(String),
 
     /// `tracing::subscriber::set_global_default` failed.
     #[error("{0}")]

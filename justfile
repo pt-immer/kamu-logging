@@ -46,6 +46,10 @@ build:
 build-all:
     cargo build --features {{ci_features}}
 
+# Check the wasm32 feature bundle.
+check-wasm:
+    cargo check --no-default-features --features wasm32 --target wasm32-unknown-unknown
+
 # Build for wasm32 target.
 build-wasm:
     cargo build --no-default-features --features wasm32 --target wasm32-unknown-unknown
@@ -53,7 +57,7 @@ build-wasm:
 # Build every supported profile (default + systemd-only + wasm32 + with-otlp).
 build-matrix: build
     cargo build --no-default-features --features systemd
-    just build-wasm
+    just validate-wasm32
     cargo build --features with-otlp
 
 # --- Test -----------------------------------------------------------------
@@ -92,6 +96,10 @@ lint-all: lint-rs lint-md
 # Clippy across the full bundle + wasm32 with -D warnings.
 lint-rs:
     cargo clippy --all-targets --features {{ci_features}} -- -D warnings
+    just clippy-wasm
+
+# Clippy for the wasm32 feature bundle.
+clippy-wasm:
     cargo clippy --no-default-features --features wasm32 --target wasm32-unknown-unknown -- -D warnings
 
 # Run markdownlint (requires Node.js / npx).
@@ -111,6 +119,10 @@ doc-open:
 # Build docs treating warnings as errors (PR gate).
 doc-check:
     RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --features {{ci_features}}
+
+# Build wasm32 docs treating warnings as errors.
+doc-wasm:
+    RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --no-default-features --features wasm32 --target wasm32-unknown-unknown
 
 # --- MSRV -----------------------------------------------------------------
 
@@ -163,6 +175,13 @@ semver:
 example NAME *ARGS:
     cargo run --example {{NAME}} --features {{ci_features}} {{ARGS}}
 
+# Compile the standalone Cloudflare Worker example.
+check-worker-example:
+    cargo check --manifest-path examples/cloudflare-worker/Cargo.toml --target wasm32-unknown-unknown
+
+# Validate the wasm32 support path without requiring Cloudflare credentials.
+validate-wasm32: check-wasm build-wasm doc-wasm check-worker-example
+
 # --- Release ------------------------------------------------------------
 
 # Dry-run cargo publish (validates manifest + builds the package).
@@ -178,7 +197,7 @@ tag VERSION:
 # --- Aggregates ---------------------------------------------------------
 
 # Run every check that the PR gate runs. Mirrors pr.yml.
-gate-all: fmt-check lint-all test-all build-wasm doc-check audit
+gate-all: fmt-check lint-all test-all validate-wasm32 doc-check audit
     @echo "All PR gates passed locally."
 
 # Like gate-all, plus the slow checks (coverage + semver + msrv).

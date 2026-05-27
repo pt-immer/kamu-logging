@@ -5,7 +5,9 @@
 /// `Auto` is replaced at init time by [`Format::Pretty`] when the chosen sink
 /// is a TTY and [`Format::Compact`] otherwise. Set the `KAMU_LOG_FORMAT`
 /// environment variable (`auto`, `compact`, `pretty`, `json`) to override
-/// without code changes.
+/// without code changes. On wasm32, `Auto` resolves to [`Format::Json`] for
+/// Cloudflare Workers Logs-friendly console output, and [`Format::Pretty`]
+/// falls back to non-ANSI compact output.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Format {
@@ -39,7 +41,8 @@ impl Format {
 /// `Auto` (default) emits to the console when stdout is a TTY and to journald
 /// otherwise. Set `KAMU_LOG_SINK` (`auto`, `stdout`, `stderr`, `journald`) to
 /// override without code changes. `Journald` is rejected on targets without
-/// the `systemd` feature.
+/// the `systemd` feature. On wasm32, `Auto`, `Stdout`, and `Stderr` all map to
+/// the JavaScript console.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Sink {
@@ -170,6 +173,26 @@ impl InitOptions {
             "debug"
         } else {
             "info"
+        }
+    }
+
+    #[cfg(feature = "wasm32")]
+    pub(crate) fn resolved_default_filter(&self) -> &str {
+        if let Some(filter) = self.default_filter.as_deref() {
+            return filter;
+        }
+        if cfg!(debug_assertions) {
+            "debug"
+        } else {
+            "info"
+        }
+    }
+
+    #[cfg(feature = "wasm32")]
+    pub(crate) fn resolved_wasm_format(&self) -> Format {
+        match self.format {
+            Format::Auto => Format::Json,
+            format => format,
         }
     }
 }

@@ -47,10 +47,12 @@ pub fn init_or_skip() -> Result<(), Error> {
 ///
 /// - [`Error::AlreadyInitialized`] if `idempotent` is `false` and a
 ///   subscriber is already set.
-/// - [`Error::TracingGlobal`] / [`Error::TracingLog`] on subscriber setup
+/// - [`Error::InvalidConfiguration`] if the selected target cannot honor an
+///   option (for example `Sink::Journald` on wasm32).
+/// - [`Error::TracingGlobal`] / `Error::TracingLog` on subscriber setup
 ///   failure.
 /// - [`Error::IO`] if the journald socket is unavailable.
-/// - [`Error::OtlpInit`] (with-otlp feature) if the exporter cannot be built.
+/// - `Error::OtlpInit` (with-otlp feature) if the exporter cannot be built.
 pub fn init_with(options: InitOptions) -> Result<(), Error> {
     #[cfg(feature = "systemd")]
     {
@@ -58,8 +60,7 @@ pub fn init_with(options: InitOptions) -> Result<(), Error> {
     }
     #[cfg(feature = "wasm32")]
     {
-        let _ = options;
-        init_wasm32();
+        init_wasm32(options)?;
     }
 
     Ok(())
@@ -227,10 +228,69 @@ fn build_output_layer(
 }
 
 #[cfg(feature = "wasm32")]
-fn init_wasm32() {
-    let _ = WASM32_LOG_INIT.get_or_init(|| {
-        console_error_panic_hook::set_once();
-        let _ = wasm_tracing::try_set_as_global_default();
+fn init_wasm32(options: InitOptions) -> Result<(), Error> {
+    use crate::{Format, Sink};
+    use tracing_subscriber::layer::SubscriberExt;
+
+    if WASM32_LOG_INIT.get().is_some() {
+        return Ok(());
+    }
+
+    if options.sink == Sink::Journald {
+        return Err(Error::InvalidConfiguration(
+            "Sink::Journald is only available with the systemd feature".to_owned(),
+        ));
+    }
+
+    console_error_panic_hook::set_once();
+
+    let filter_layer = tracing_subscriber::EnvFilter::new(options.resolved_default_filter());
+    let writer = tracing_web::MakeWebConsoleWriter::new();
+    let timer = tracing_subscriber::fmt::time::UtcTime::rfc_3339();
+    let subscriber = tracing_subscriber::registry().with(filter_layer);
+
+    let set_result = match options.resolved_wasm_format() {
+        Format::Json | Format::Auto => {
+            let fmt_layer = tracing_subscriber::fmt::layer()
+                .json()
+                .with_ansi(false)
+                .with_timer(timer)
+                .with_current_span(true)
+                .with_span_list(false)
+                .with_writer(writer);
+            tracing::subscriber::set_global_default(subscriber.with(fmt_layer))
+        }
+        Format::Pretty => {
+            let fmt_layer = tracing_subscriber::fmt::layer()
+                .compact()
+                .with_ansi(false)
+                .with_timer(timer)
+                .with_writer(writer);
+            tracing::subscriber::set_global_default(subscriber.with(fmt_layer))
+        }
+        Format::Compact => {
+            let fmt_layer = tracing_subscriber::fmt::layer()
+                .compact()
+                .with_ansi(false)
+                .with_timer(timer)
+                .with_writer(writer);
+            tracing::subscriber::set_global_default(subscriber.with(fmt_layer))
+        }
+    };
+
+    if let Err(err) = set_result {
+        return if options.idempotent {
+            Ok(())
+        } else {
+            Err(Error::from(err))
+        };
+    }
+
+    let _ = WASM32_LOG_INIT.set(());
+    if let Some(name) = options.service_name.as_deref() {
+        tracing::info!(service.name = %name, "Logging initialized");
+    } else {
         tracing::info!("Logging initialized");
-    });
+    }
+    Ok(())
 }
