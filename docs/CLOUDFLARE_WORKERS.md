@@ -31,21 +31,33 @@ intentionally incompatible with `wasm32`.
 
 ## Initialize logging
 
-Workers have a single global tracing subscriber. Initialize logging once during
-startup, or call the idempotent path from every fetch handler:
+Workers have a single global tracing subscriber, gated by an internal
+`OnceLock` — the **first** `init_with` call wins for the isolate's lifetime,
+and later calls are no-ops. When the filter depends on an `Env` binding
+(see [Configure filtering from Worker variables](#configure-filtering-from-worker-variables)
+below), this matters: install the subscriber on the **first fetch**, where
+`Env` is available. Do **not** install from `#[event(start)]` as well — `start`
+runs before any fetch, so a start-time install latches the default filter and
+the fetch-time install with the env-derived filter is silently discarded.
+
+`init_with` calls `console_error_panic_hook::set_once()` internally on the
+wasm32 path, so a separate `#[event(start)]` handler is not required for panic
+hook installation.
 
 ```rust
 use kamu_logging::{Format, InitOptions, Sink, init_with};
-use worker::{Env, event};
+use worker::{Context, Env, Request, Response, Result, event};
 
-#[event(start)]
-fn start() {
+#[event(fetch)]
+async fn main(_req: Request, env: Env, _ctx: Context) -> Result<Response> {
     let _ = init_with(
         InitOptions::default()
             .with_format(Format::Json)
             .with_sink(Sink::Stdout)
             .idempotent(true),
     );
+    let _ = &env;
+    Response::ok("ok")
 }
 ```
 
@@ -56,7 +68,8 @@ because terminal styling is not useful in the Worker console.
 ## Configure filtering from Worker variables
 
 Rust libraries cannot read Cloudflare `Env` bindings by themselves. Read the
-binding in your Worker and pass it into `InitOptions::with_default_filter`:
+binding inside `#[event(fetch)]` and pass it into
+`InitOptions::with_default_filter` on the first call:
 
 ```rust
 use kamu_logging::{Format, InitOptions, Sink, init_with};
@@ -75,6 +88,13 @@ fn init_logging(env: &Env) {
     let _ = init_with(options);
 }
 ```
+
+`RUST_LOG` is a deploy-time variable and is constant for the isolate's
+lifetime, so first-fetch-wins is sufficient — no reloadable filter layer is
+needed. If you also wire up `#[event(start)]`, restrict it to work that is
+independent of the subscriber (for example, application-specific one-time
+setup); do **not** call `init_with` from `start` when filtering is driven by
+`Env`.
 
 In `wrangler.toml`:
 

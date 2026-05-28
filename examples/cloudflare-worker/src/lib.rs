@@ -5,14 +5,9 @@ use kamu_logging::{
 };
 use worker::{Context, Env, Request, Response, Result, event};
 
-#[event(start)]
-fn start() {
-    init_logging(None);
-}
-
 #[event(fetch)]
 async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
-    init_logging(Some(&env));
+    init_logging(&env);
 
     let method = req.method().to_string();
     let path = req.path();
@@ -30,13 +25,13 @@ async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
     Response::ok("hello from kamu-logging on Cloudflare Workers")
 }
 
-fn init_logging(env: Option<&Env>) {
+fn init_logging(env: &Env) {
     let mut options = InitOptions::default()
         .with_format(Format::Json)
         .with_sink(Sink::Stdout)
         .idempotent(true);
 
-    if let Some(filter) = env.and_then(worker_log_filter) {
+    if let Some(filter) = worker_log_filter(env) {
         options = options.with_default_filter(filter);
     }
 
