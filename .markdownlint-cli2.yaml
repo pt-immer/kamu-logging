@@ -19,3 +19,5 @@ ignores:
   - "target/**"
   - "node_modules/**"
   - ".github/**"
+  # Local agent-instruction file; not a distributable doc.
+  - "CLAUDE.md"
