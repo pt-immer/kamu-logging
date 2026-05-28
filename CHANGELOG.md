@@ -4,6 +4,25 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project follows
 [SemVer](https://semver.org/) from `1.0.0` onwards.
 
+## [1.1.1] — 2026-05-28
+
+Patch release. No library code or public API changes; example and docs only.
+
+### Fixed
+
+- Cloudflare Worker example (`examples/cloudflare-worker/src/lib.rs`) called
+  `init_with` from both `#[event(start)]` and `#[event(fetch)]`. Because the
+  `wasm32` init path is `OnceLock`-gated and first-init-wins, the start-time
+  call (with `env = None`) latched the default filter and the fetch-time call
+  that reads `env.var("RUST_LOG")` was silently discarded — the wrangler.toml
+  `RUST_LOG` binding never reached `EnvFilter`. Dropped the `#[event(start)]`
+  handler; `init_wasm32` invokes `console_error_panic_hook::set_once()`
+  internally, so the panic hook still installs on first fetch.
+- `docs/CLOUDFLARE_WORKERS.md` previously presented start-time init and
+  per-fetch idempotent init as interchangeable, which is what produced the
+  bug. Guidance now mandates first-fetch install when filtering is driven by
+  an `Env` binding and warns against calling `init_with` from `start`.
+
 ## [1.1.0] — 2026-05-27
 
 Additive feature release focused on first-class Cloudflare Worker support.
